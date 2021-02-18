@@ -1,0 +1,1 @@
+print('aloha'.encode('utf8'))
