@@ -12,3 +12,4 @@ class JobsSearchItem(scrapy.Item):
     job_title = scrapy.Field()
     job_company = scrapy.Field()
     job_link = scrapy.Field()
+    job_keyword = scrapy.Field()

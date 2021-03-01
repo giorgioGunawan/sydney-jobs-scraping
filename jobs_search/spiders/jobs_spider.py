@@ -1,43 +1,25 @@
 import scrapy
-import re
 from ..items import JobsSearchItem
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# indeed:
-# first = '//*[contains(concat( " ", @class, " " ),concat( " ", "jobsearch-SerpJobCard", " " ))]'
-# second = '//a[contains(concat( " ", @class, " " ),concat( " ", "jobtitle", " " ))]'
-# response.xpath(first+second+'/@title').getall()
-
-class JobsSpiderSpider(scrapy.Spider):
-    name = 'indeed_jobs'
-    complete_job_titles = []
-    complete_job_companies = []
-    complete_job_links = []
+class IndeedSpider(scrapy.Spider):
+    name = 'indeed_spider'
     start_urls = [
         'https://au.indeed.com/jobs?q=software+engineer&l=Sydney+NSW'
     ]
-    user_input = 'intern'
+    user_input = ''
     page_number = -1
-
-    def clearDB(self):
-        file = open("temp.csv", "a")
-        file.truncate(0)
-        file.close()
 
     def gsheet(self):
         scopes = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_name('secret.json', scopes)
         client = gspread.authorize(creds)
-
         sheet = client.open('Indeed Jobs Scrape').get_worksheet(0)
         return sheet
 
     def parse(self, response):
         # Google sheet prep
-        sheet_instance = JobsSpiderSpider.gsheet(self)
-        #if JobsSpiderSpider.page_number == 0:
-        #    JobsSpiderSpider.clearDB(self)
         item = JobsSearchItem()
 
         #Job Title
@@ -45,12 +27,12 @@ class JobsSpiderSpider(scrapy.Spider):
         a_title = '//a[contains(concat( " ", @class, " " ),concat( " ", "jobtitle", " " ))]'
         job_title = response.xpath(div_root+a_title+'/@title').getall()
 
-        # Job Link
+        #Job Link
         job_link = response.xpath(div_root + a_title + '/@href').getall()
         for i in range(len(job_link)):
            job_link[i] = 'https://au.indeed.com' + job_link[i]
 
-        #Job Company Lister
+        #Job Company
         div_root = '//div[contains(concat( " ", @class, " " ),concat( " ", "sjcl", " " ))]/div'
         span_text = '//span[contains(concat( " ", @class, " " ),concat( " ", "company", " " ))]'
         job_company = response.xpath(span_text).getall()
@@ -68,7 +50,7 @@ class JobsSpiderSpider(scrapy.Spider):
                 keyword = '</span>'
 
             index = company.find(keyword)
-            while (company[index - 1] != '>'):
+            while company[index - 1] != '>':
                 temp_company = company[index - 1] + temp_company
                 index -= 1
 
@@ -77,49 +59,94 @@ class JobsSpiderSpider(scrapy.Spider):
             # '\n' the newline character
             job_company[i] = temp_company[1:]
 
-        if JobsSpiderSpider.page_number != -1:
+        if IndeedSpider.page_number != -1:
             item['job_title'] = job_title
             item['job_company'] = job_company
             item['job_link'] = job_link
-            JobsSpiderSpider.complete_job_titles.extend(job_title)
-            JobsSpiderSpider.complete_job_companies.extend(job_company)
-            JobsSpiderSpider.complete_job_links.extend(job_link)
+            item['job_keyword'] = IndeedSpider.user_input
             yield item
 
         # increment page number
-        JobsSpiderSpider.page_number += 1
+        IndeedSpider.page_number += 1
 
         # limit to 5 pages of search
-        if JobsSpiderSpider.page_number < 2:
+        if IndeedSpider.page_number < 2:
             next_page = 'https://au.indeed.com/jobs?q='+self.user_input+'&l=Sydney+NSW&start=' + \
-                        str(JobsSpiderSpider.page_number) + '0'
+                        str(IndeedSpider.page_number) + '0'
             yield response.follow(next_page, callback=self.parse)
 
+class SeekSpider(scrapy.Spider):
+    name = 'seek_spider'
+    start_urls = [
+        'https://www.seek.com.au/software-engineer-jobs?page=2'
+    ]
+    user_input = ''
+    page_number = -1
+
+    def gsheet(self):
+        scopes = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_name('secret.json', scopes)
+        client = gspread.authorize(creds)
+        sheet = client.open('Indeed Jobs Scrape').get_worksheet(0)
+        return sheet
+
+    def parse(self, response):
+        # Google sheet prep
+        item = JobsSearchItem()
+
+        #Job Title
+        article_tag = '//article[contains(concat( " ", @class, " " ),concat( " ", "_37iADb_", " " ))]'
+        job_title = response.xpath(article_tag+'/@aria-label').getall()
+
+        #Job Link
+        a_title = '//a[contains(concat( " ", @class, " " ),concat( " ", "_2S5REPk", " " ))]'
+        job_link = response.xpath(a_title + '/@href').getall()
+        for i in range(len(job_link)):
+           job_link[i] = 'https://www.seek.com.au/' + job_link[i]
+
+        #Job Company
+        span_root = '//span[contains(concat( " ", @class, " " ),concat( " ", "_3mgsa7- _15GBVuT _2Ryjovs", " " ))]'
+        a_company = '//a[contains(concat( " ", @class, " " ),concat( " ", "_17sHMz8", " " ))]'
+        raw_company = response.xpath(span_root + a_company + '/@aria-label').getall()
+        job_company = []
+        for i in range(len(raw_company)):
+            if('Jobs' in raw_company[i]):
+                job_company.append(raw_company[i][7:])
+        if SeekSpider.page_number != -1:
+            item['job_title'] = job_title
+            item['job_company'] = job_company
+            item['job_link'] = job_link
+            item['job_keyword'] = IndeedSpider.user_input
+            yield item
         else:
-            titles = JobsSpiderSpider.complete_job_titles
-            companies = JobsSpiderSpider.complete_job_companies
-            links = JobsSpiderSpider.complete_job_links
+            # Initially, add the header of each column
+            SeekSpider.page_number += 1
 
-            sheet = JobsSpiderSpider.gsheet(self)
-            sheet.clear()
+        # increment page number
+        SeekSpider.page_number += 1
 
-            file = open("temp.csv", "a")
-            file.write("Title, Company, Source, Keyword, Link" + "\n")
+        # limit to 5 pages of search
+        if SeekSpider.page_number < 3:
+            temp_user_input = self.user_input.replace('+','-')
+            next_page = 'https://www.seek.com.au/'+temp_user_input+\
+                        '-jobs/in-All-Sydney-NSW?page='+str(SeekSpider.page_number)
+            yield response.follow(next_page, callback=self.parse)
 
-            for i in range(len(companies) if len(companies) <= len(titles) else len(titles)):
-                file.write(str(titles[i].replace(',', ' ')) + "," + str(companies[i].replace(',', ' ')) + ","
-                           + "Indeed" + "," + self.user_input.replace('+', ' ') + "," +
-                           str(links[i].replace(',', ' ')) + "," + "\n")
+class Reset(scrapy.Spider):
+    # NOT A SPIDER, JUST TO RESET THE DATABASE
+    name = 'reset_spider'
+    start_urls = ['https://www.google.com.au']
+    def gsheet(self):
+        scopes = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_name('secret.json', scopes)
+        client = gspread.authorize(creds)
+        sheet = client.open('Indeed Jobs Scrape').get_worksheet(0)
+        return sheet
 
-            file.close()
-            scopes = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-            creds = ServiceAccountCredentials.from_json_keyfile_name('secret.json', scopes)
-            client = gspread.authorize(creds)
-            content = open('temp.csv', 'r').read()
-            client.import_csv('1ScJ2LJ6wkg09vDs7nKT-UfeI2-UcphQ7cSBDTi4Qq8I',content)
-
-            file = open("temp.csv", "a")
-            file.truncate(0)
-            file.close()
-
-
+    def parse(self,response):
+        file = open("temp.csv", "a")
+        file.truncate(0)
+        file.write("Title, Company, Source, Keyword, Link" + "\n")
+        file.close()
+        sheet = Reset.gsheet(self)
+        sheet.clear()
