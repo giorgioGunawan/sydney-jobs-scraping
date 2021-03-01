@@ -14,6 +14,8 @@ pip install Scrapy
 
 The dependencies include:
 
+- Python: python.org
+
 - Random User-Agent middleware package: https://pypi.org/project/scrapy-user-agents/
 Installation:
 ```
