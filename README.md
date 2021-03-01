@@ -54,6 +54,9 @@ It is important that the string in user_input uses '+' instead of spaces.
 > scrapy crawl 'reset-spider'
 ```
 
+## Google API
+The google API is exposed in this project. Limits on quotas and restrictions on usage are placed. 
+
 
 
 
