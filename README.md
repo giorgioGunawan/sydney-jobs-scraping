@@ -1,7 +1,7 @@
 # sydney-jobs-scraping
 
 ## About
-Scrapes jobs from two biggest sites namely Indeed and Seek for jobs in Sydney NSW and presents it at https://jobs-scrape-dashboard.herokuapp.com/. 
+Scrapes jobs from two biggest sites namely Indeed and Seek for jobs in Sydney NSW and presents it at https://jobs-scrape-dashboard.herokuapp.com/ (may take up to a minute to load). 
 This project uses web scraping to quickly obtain information without integrating multiple APIs. The data can also be seen in google sheet form: bit.ly/jobs-scrape.
 The code that links the google sheet form to the website can be found in https://github.com/giorgioGunawan/reactAndGoogleSheets.
 
